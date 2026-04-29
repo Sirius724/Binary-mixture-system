@@ -13,7 +13,7 @@ REPORT_FILE="report.tex"
 README_FILE="README.md"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 GIT_USER_NAME="${GIT_USER_NAME:-Jeong Kangeun}"
-GIT_USER_EMAIL="${GIT_USER_EMAIL:-kangeun.j@gmail.com}"
+GIT_USER_EMAIL="${GIT_USER_EMAIL:-j92724@gmail.com}"
 
 # Color codes
 RED='\033[0;31m'
