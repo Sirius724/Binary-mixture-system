@@ -9,6 +9,10 @@
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
+#include <sys/stat.h>
+#ifdef _WIN32
+#include <direct.h>
+#endif
 #include "sprng.h"   /* SPRNG header file (Parallel random number generator) */
 
 /* 랜덤 넘버 관련 전역 변수 */
@@ -42,6 +46,20 @@ int main(int argc, char **argv)
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
     MPI_Comm_size(MPI_COMM_WORLD, &np);
+
+    /* 커맨드 라인 인자 파싱 */
+    if (argc > 1) T_sim = atof(argv[1]);
+    if (argc > 2) h0_mag = atof(argv[2]);
+    if (argc > 3) kappa = atof(argv[3]);
+
+    if (myrank == 0) {
+        printf("==========================================\n");
+        printf("Simulation Parameters:\n");
+        printf("T_sim  : %.3f\n", T_sim);
+        printf("h0_mag : %.3f\n", h0_mag);
+        printf("kappa  : %.3f\n", kappa);
+        printf("==========================================\n");
+    }
 
     /* 병렬 랜덤 넘버 초기화 */
     int SEED = time(NULL);
@@ -92,11 +110,26 @@ int main(int argc, char **argv)
     /* 0번 노드에서 결과 파일 저장 */
     if(myrank == 0)
     {
+        double total_s = 0.0;
+        
+        // 데이터 저장 폴더 생성 (이미 존재하면 무시됨)
+#ifdef _WIN32
+        _mkdir("data");
+#else
+        mkdir("data", 0777);
+#endif
+
         FILE *fp = fopen("data/spin_profile.txt", "w+");
+        if (fp == NULL) {
+            printf("Error: Cannot create/open 'data' directory or file.\n");
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+
         for(int i = 0; i < L; i++)
         {
             // 노드 개수(np)로 나누어 최종 앙상블 평균 완성
             spin_profile_mpi[i] /= (double)np;
+            total_s += spin_profile_mpi[i];
             
             // Plotting의 편의를 위해 원점(x=0)을 중앙으로 정렬 (-L/2 ~ L/2)
             int x_coord = i;
@@ -105,7 +138,9 @@ int main(int argc, char **argv)
             fprintf(fp, "%d %10.6f\n", x_coord, spin_profile_mpi[i]);
         }
         fclose(fp);
+        total_s /= (double)L;
         printf("Simulation completed. Profile saved to data/spin_profile.txt\n");
+        printf("Average magnetization <s>: %10.6f\n", total_s);
     }
 
     /* 메모리 해제 및 종료 */
@@ -134,7 +169,7 @@ void init_yukawa(double kap)
 void initial_conf()
 {
     for(int i = 0; i < L; i++) {
-        th[i] = (round(sprng(stream))) * 2.0 - 1.0;
+        th[i] = (sprng(stream) < 0.5) ? -1 : 1;
         spin_profile[i] = 0.0;
     }
 }
