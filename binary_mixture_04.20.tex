@@ -1,0 +1,215 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage{amsmath, amssymb, physics, kotex}
+\usepackage{geometry}
+\geometry{margin=0.8in}
+\usepackage{hyperref}
+\usepackage{graphicx}
+
+\title{Statistical Field Theory in Soft Matter:\\ From Microscopic Ising-Yukawa Model to Local Critical Phenomena}
+\author{Jeong Kangeun}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Ising Model with Yukawa Interactions: A Rigorous Field-Theoretic Approach}
+
+In this section, we will walk through the exact mathematical steps required to translate a microscopic, discrete lattice model into a macroscopic, continuous field theory. We will use a magnetic system as our example: an Ising-like model where spins ($s_i = \pm 1$) interact via a non-local, ferromagnetic Yukawa potential $V_Y$ in the presence of an external magnetic field $h$. 
+
+Our goal is to make every mathematical transition—especially the jump from discrete points to a continuous space—crystal clear.
+
+\subsection{Step 1: The Mathematical Bridge (Continuous Spin Density)}
+In traditional lattice models, we describe interactions using discrete sums over lattice sites $i$ and $j$. However, field theory operates in a continuous space ($\mathbf{r}$). To rigorously connect these two worlds, we introduce the \textbf{microscopic spin density} $\rho(\mathbf{r})$. 
+
+Using the Dirac delta function $\delta(\mathbf{r} - \mathbf{r}_i)$, which acts as a mathematical "spike" that is exactly zero everywhere except at the position $\mathbf{r}_i$, we can write the spin density as a continuous spatial function:
+\begin{equation}
+    \rho(\mathbf{r}) = \sum_i s_i \delta(\mathbf{r} - \mathbf{r}_i)
+\end{equation}
+Similarly, we represent the external magnetic field as a continuous function $h(\mathbf{r})$.
+
+By using this continuous density, we can rewrite the entire Hamiltonian $\mathcal{H}$ using spatial integrals instead of discrete sums. The interaction between two spins at different locations becomes an interaction between two density points:
+\begin{equation}
+    \mathcal{H} = -\frac{1}{2} \int d\mathbf{r} d\mathbf{r}' \rho(\mathbf{r}) V_Y(\mathbf{r} - \mathbf{r}') \rho(\mathbf{r}') - \int d\mathbf{r} h(\mathbf{r}) \rho(\mathbf{r})
+\end{equation}
+\textit{Note: When we replace the discrete sum $\sum_{i \neq j}$ with continuous integrals, we accidentally include the case where $\mathbf{r} = \mathbf{r}'$ (a spin interacting with itself). This generates an infinite "self-energy". However, because Ising spins have a fixed magnitude ($s_i^2 = 1$), this self-energy is merely a constant additive value. In statistical mechanics, adding a constant to the energy does not change the physical behavior or phase transitions, so we can safely ignore it.}
+
+The grand partition function $Z$, which is the sum of Boltzmann weights over all possible spin configurations $\{s_i\}$, is now written purely in terms of continuous integrals:
+\begin{equation}
+    Z = \sum_{\{s_i\}} \exp\left( \frac{\beta}{2} \int d\mathbf{r} d\mathbf{r}' \rho(\mathbf{r}) V_Y(\mathbf{r} - \mathbf{r}') \rho(\mathbf{r}') + \beta \int d\mathbf{r} h(\mathbf{r}) \rho(\mathbf{r}) \right)
+\end{equation}
+
+\subsection{Step 2: Decoupling via Hubbard-Stratonovich Transformation}
+The partition function $Z$ contains a quadratic term ($\rho \times \rho$) in the exponential, which is mathematically notoriously difficult to calculate because the spins are entangled. 
+
+To "decouple" them, we use the \textbf{Hubbard-Stratonovich (HS) transformation}. Think of this as a mathematical trick: instead of particles interacting directly with each other, we imagine they interact independently with a newly introduced "auxiliary field" $\psi(\mathbf{r})$. 
+
+Since ferromagnetic spins attract, the interaction energy lowers the total energy, leading to a positive sign in the exponential. This allows us to use a \textbf{real} continuous field $\psi(\mathbf{r})$. Applying the HS identity using the inverse Yukawa operator $V_Y^{-1} \propto (-\nabla^2 + \kappa^2)$, we get:
+\begin{equation}
+    \exp\left( \frac{\beta}{2} \int \rho V_Y \rho \right) \propto \int \mathcal{D}\psi \exp\left( -\frac{\beta}{2} \int d\mathbf{r} \ \psi(\mathbf{r}) V_Y^{-1} \psi(\mathbf{r}) + \beta \int d\mathbf{r} \ \rho(\mathbf{r}) \psi(\mathbf{r}) \right)
+\end{equation}
+
+Let's substitute this back into our partition function $Z$. Notice how the spin density $\rho(\mathbf{r})$ now appears only in linear terms (to the power of 1). It couples to both the internal field $\psi(\mathbf{r})$ and the external field $h(\mathbf{r})$:
+\begin{equation}
+    Z \propto \int \mathcal{D}\psi \exp\left( -\frac{\beta}{2} \int \psi V_Y^{-1} \psi \right) \sum_{\{s_i\}} \exp\left( \beta \int d\mathbf{r} \ \rho(\mathbf{r}) \big[ \psi(\mathbf{r}) + h(\mathbf{r}) \big] \right)
+\end{equation}
+
+\subsection{Step 3: Returning to Discrete Using Delta Function}
+Now we encounter the most beautiful part of the derivation. We have a continuous integral containing $\rho(\mathbf{r})$. Let's substitute the original definition $\rho(\mathbf{r}) = \sum_i s_i \delta(\mathbf{r} - \mathbf{r}_i)$ back into the linear coupling term.
+
+A fundamental property of the Dirac delta function is that integrating it with any function $f(\mathbf{r})$ simply evaluates that function at the spike's location: $\int f(\mathbf{r}) \delta(\mathbf{r} - \mathbf{r}_i) d\mathbf{r} = f(\mathbf{r}_i)$. Therefore:
+\begin{equation}
+    \beta \int d\mathbf{r} \left( \sum_i s_i \delta(\mathbf{r} - \mathbf{r}_i) \right) \big[ \psi(\mathbf{r}) + h(\mathbf{r}) \big] = \beta \sum_i s_i \big( \psi(\mathbf{r}_i) + h(\mathbf{r}_i) \big)
+\end{equation}
+This rigorous step elegantly collapses the continuous integral back into a discrete sum over the lattice sites. The continuous fields $\psi$ and $h$ are perfectly "sampled" at the exact locations of the spins.
+
+\subsection{Step 4: Evaluating the Spin Trace (The Hyperbolic Cosine)}
+Because the spins are no longer multiplied by each other ($s_i \times s_j$), they are completely decoupled. We can calculate the sum over the states ($s_i = +1$ and $s_i = -1$) independently for each lattice site $i$:
+\begin{align}
+    \sum_{s_i = \pm 1} \exp\left( \beta s_i (\psi_i + h_i) \right) &= \exp\left( +\beta (\psi_i + h_i) \right) + \exp\left( -\beta (\psi_i + h_i) \right) \nonumber \\
+    &= 2\cosh\big(\beta(\psi_i + h_i)\big)
+\end{align}
+Since this sum must be performed for every spin $i$ in the lattice, the result is a massive product ($\prod$) over all sites:
+\begin{equation}
+    \sum_{\{s_i\}} \exp(\dots) = \prod_{i=1}^N 2\cosh\big(\beta(\psi_i + h_i)\big)
+\end{equation}
+
+\subsection{Step 5: The Continuum Limit via Riemann Sum}
+To complete our field theory, we want to convert this discrete product back into a continuous spatial integral. We start by taking the logarithm, which turns the product into a sum: $\sum_{i=1}^N \ln \big[ 2\cosh(\dots) \big]$.
+
+Let $\Delta V = a^D$ be the volume of a single $D$-dimensional unit cell. We can multiply and divide the sum by this volume, structuring it exactly like a Riemann sum from basic calculus:
+\begin{equation}
+    \sum_{i=1}^N \Delta V \left[ \frac{1}{a^D} \ln\big[2\cosh(\dots)\big] \right]
+\end{equation}
+\textbf{The Long-Wavelength Assumption:} If we assume that the lattice spacing $a$ is extremely small, and that the fields $\psi$ and $h$ change very smoothly over space, we can take the continuum limit. The discrete sum of volume elements seamlessly transforms into a spatial integral ($\sum \Delta V \to \int d\mathbf{r}$):
+\begin{equation}
+    \int d\mathbf{r} \ \frac{1}{a^D} \ln \Big[ 2\cosh\big(\beta(\psi(\mathbf{r}) + h(\mathbf{r}))\big) \Big]
+\end{equation}
+
+
+\section{The Master Equation: Non-linear Ginzburg-Landau Theory}
+In this report, we analyze the effect of a local external field $h(\mathbf{r})$ on the order parameter distribution of a system, based on the exact non-linear Ginzburg-Landau effective free energy functional derived via the Hubbard-Stratonovich (HS) transformation. The effective free energy density is given by:
+\begin{equation}
+    \beta \mathcal{F}[\psi] = \int d\mathbf{r} \left\{ \frac{\beta}{2} \psi(\mathbf{r}) V_Y^{-1} \psi(\mathbf{r}) - \frac{1}{a^D} \ln \Big[ 2\cosh\big(\beta(\psi(\mathbf{r}) + h(\mathbf{r}))\big) \Big] \right\}
+\end{equation}
+To find the equilibrium state of the natural system, we apply the calculus of variations by setting the functional derivative to zero ($\delta \mathcal{F}/\delta \psi = 0$). Since the derivative of $\ln(\cosh x)$ is $\tanh x$, we obtain the following exact, non-linear Euler-Lagrange differential equation, which serves as our Master Equation:
+\begin{equation}
+    c(-\nabla^2 + \kappa^2)\psi(\mathbf{r}) - \frac{1}{a^D} \tanh\big[\beta(\psi(\mathbf{r}) + h(\mathbf{r}))\big] = 0
+\end{equation}
+This equation is the rigorous governing equation of the system, containing no mathematical approximations.
+
+\section{Ginzburg-Landau Expansion and Coefficient Mapping}
+To compare the physical implications of the Master Equation with standard phase transition theory, we perform a Taylor expansion of the non-linear term in the free energy near the critical point (where the fluctuation field $\psi$ is small). Defining the inverse of the lattice volume element as the spin density $\rho_0 \equiv 1/a^D$, and substituting $x = \beta(\psi+h)$ into the Maclaurin series $\ln(2\cosh x) \approx \ln 2 + \frac{1}{2}x^2 - \frac{1}{12}x^4$, we obtain the inhomogeneous Ginzburg-Landau form:
+\begin{equation}
+    \mathcal{F}_{GL}[\psi] = \int d\mathbf{r} \left[ \frac{C}{2} (\nabla \psi)^2 + \frac{A(\mathbf{r})}{2} \psi^2 + \frac{U}{4} \psi^4 - H_{\text{eff}}(\mathbf{r}) \psi \right] + F_0
+\end{equation}
+Mapping each GL coefficient to the microscopic parameters derived from the HS transformation yields the following:
+\begin{itemize}
+    \item \textbf{Gradient Coefficient ($C$):} $C = c$ 
+    \item \textbf{Quartic Coefficient ($U$):} $U = \frac{\rho_0 \beta^3}{3}$
+    \item \textbf{Effective Field ($H_{\text{eff}}$):} $H_{\text{eff}}(\mathbf{r}) = \rho_0 \beta h(\mathbf{r}) - \frac{\rho_0 \beta^3}{3} h^3(\mathbf{r})$
+    \item \textbf{Local Mass/Temperature Coefficient ($A$):}
+    \begin{equation}
+        A(\mathbf{r}) = c \kappa^2 - \rho_0 \beta + \rho_0 \beta^3 h^2(\mathbf{r})
+    \end{equation}
+\end{itemize}
+In the standard GL theory, the external field is treated merely as a linear perturbation ($-h\psi$). However, in our derivation, $h(\mathbf{r})$ resides inside the $\cosh$ function, inducing non-linear coupling terms ($6h^2\psi^2$) upon expansion. The most crucial observation is the addition of the $+h^2(\mathbf{r})$ term to the quadratic coefficient $A(\mathbf{r})$. This implies that the phase transition condition ($A=0$) changes in localized regions where $h(\mathbf{r})$ exists. Consequently, this mathematically proves that the external field not only breaks symmetry but directly shifts the \textbf{local critical temperature (Local $T_c$)}.
+
+\section{Linear Approximation and Geometric Case Studies}
+In the small-signal regime where the temperature is above the critical point ($T \gtrsim T_c$) and the external field $h_0$ is weak, the fluctuation field $\psi$ is small. Thus, we can perform a linearization by ignoring higher-order terms ($\psi^3, h^2, h^3$). Accordingly, the local coefficient $A(\mathbf{r})$ is approximated by the bulk constant $A_0 = c\kappa^2 - \rho_0 \beta$, and the governing equation simplifies to the following linear inhomogeneous differential equation:
+\begin{equation}
+    C \nabla^2 \psi(\mathbf{r}) - A_0 \psi(\mathbf{r}) = -\rho_0 \beta h(\mathbf{r})
+\end{equation}
+We define the correlation length as $\xi = \sqrt{C/A_0}$. We now derive the spatial profiles for two specific geometric structures under a local external field.
+
+\subsection{Case A: Semi-infinite System ($x \ge 0$)}
+Assume a semi-infinite system where the external field $h_0$ acts only at the surface ($x=0$) and vanishes deep within the bulk ($x \to \infty$).
+\begin{itemize}
+    \item \textbf{Governing Equation:} For $x > 0$, the external field is zero, yielding a homogeneous equation:
+    \begin{equation}
+        \frac{d^2 \psi}{dx^2} - \frac{1}{\xi^2} \psi = 0
+    \end{equation}
+    \item \textbf{General Solution:} The standard solution for this second-order linear ODE is:
+    \begin{equation}
+        \psi(x) = C_1 \exp\left(-\frac{x}{\xi}\right) + C_2 \exp\left(\frac{x}{\xi}\right)
+    \end{equation}
+    \item \textbf{Applying Boundary Conditions:}
+    First, the physical requirement that the order parameter must not diverge in the bulk imposes $\psi(\infty) = 0$. Therefore, we must set $C_2 = 0$.
+    \begin{equation}
+        \psi(x) = C_1 \exp\left(-\frac{x}{\xi}\right)
+    \end{equation}
+    Second, at the surface ($x=0$), the strong external field induces a fixed boundary order parameter $\psi(0) = \psi_s$ (where $\psi_s \propto h_0$). Substituting $x=0$ gives $C_1 = \psi_s$.
+    \item \textbf{Final Solution:} 
+    \begin{equation}
+        \psi(x) = \psi_s \exp\left( -\frac{x}{\xi} \right)
+    \end{equation}
+\end{itemize}
+Physically, this indicates that the order induced at the surface penetrates the bulk with an exponential decay characterized by the correlation length $\xi$. As the temperature approaches the critical point ($A_0 \to 0$), $\xi \to \infty$, causing the surface order to spread throughout the entire bulk, triggering a Critical Wetting phenomenon.
+
+\subsection{Case B: Periodic Ring System ($L$)}
+Consider a 1D periodic ring of circumference $L$, where a delta-function external field $h(x) = h_0 \delta(x)$ is applied exclusively at the origin ($x=0$).
+\begin{itemize}
+    \item \textbf{Governing Equation:}
+    \begin{equation}
+        C \frac{d^2\psi}{dx^2} - A_0 \psi = -\rho_0 \beta h_0 \delta(x)
+    \end{equation}
+    \item \textbf{General Solution Formulation:} 
+    For $x \neq 0$, the equation is homogeneous ($C\psi'' - A_0\psi = 0$). Due to the periodic boundary condition $\psi(x) = \psi(x+L)$ and the structural symmetry around the origin $\psi(x) = \psi(-x)$, the solution in the interval $x \in [-L/2, L/2]$ must be an even function centered at $x=L/2$. Thus, we construct the solution using the hyperbolic cosine:
+    \begin{equation}
+        \psi(x) = D \cosh\left( \frac{L/2 - |x|}{\xi} \right)
+    \end{equation}
+    \item \textbf{Determining the Constant $D$ via Delta Function Singularity:}
+    To find the constant $D$, we integrate the governing differential equation across the infinitesimally small interval $[-\epsilon, \epsilon]$ around $x=0$:
+    \begin{equation}
+        \int_{-\epsilon}^{\epsilon} \left( C \frac{d^2\psi}{dx^2} - A_0 \psi \right) dx = \int_{-\epsilon}^{\epsilon} -\rho_0 \beta h_0 \delta(x) dx
+    \end{equation}
+    Since $\psi(x)$ is continuous, the integral of $A_0\psi$ vanishes as $\epsilon \to 0$. The integral of the second derivative yields the jump in the first derivative:
+    \begin{equation}
+        C \left[ \frac{d\psi}{dx}\bigg|_{0^+} - \frac{d\psi}{dx}\bigg|_{0^-} \right] = -\rho_0 \beta h_0
+    \end{equation}
+    Using our assumed solution for $x > 0$, $\psi(x) = D \cosh((L/2 - x)/\xi)$, the derivative is:
+    \begin{equation}
+        \psi'(x) = -\frac{D}{\xi} \sinh\left( \frac{L/2 - x}{\xi} \right) \quad \implies \quad \psi'(0^+) = -\frac{D}{\xi} \sinh\left( \frac{L}{2\xi} \right)
+    \end{equation}
+    By symmetry, $\psi'(0^-) = -\psi'(0^+)$. Substituting these into the jump condition:
+    \begin{align}
+        C \left[ -\frac{D}{\xi} \sinh\left( \frac{L}{2\xi} \right) - \frac{D}{\xi} \sinh\left( \frac{L}{2\xi} \right) \right] &= -\rho_0 \beta h_0 \nonumber \\
+        -\frac{2CD}{\xi} \sinh\left( \frac{L}{2\xi} \right) &= -\rho_0 \beta h_0 \nonumber \\
+        D &= \frac{\rho_0 \beta h_0 \xi}{2C \sinh(L/2\xi)}
+    \end{align}
+    \item \textbf{Final Solution:}
+    \begin{equation}
+        \psi(x) = \frac{\rho_0 \beta h_0 \xi}{2C \sinh(L/2\xi)} \cosh\left( \frac{L/2 - |x|}{\xi} \right)
+    \end{equation}
+\end{itemize}
+In a closed ring structure, the order induced by the local field propagates in both directions and creates constructive interference at the opposite end ($x=L/2$), forming a smooth U-shaped $\cosh$ profile.
+
+\section{Critical Phenomena and Finite-Size Scaling}
+
+\subsection{Bulk Critical Temperature ($T_c$)}
+The intrinsic critical temperature of the system (Bulk $T_c$) is determined at the point where the bulk coefficient $A_0$ becomes zero in the absence of an external field, causing the correlation length to diverge.
+\begin{equation}
+    T_c = \frac{\rho_0}{k_B c \kappa^2}
+\end{equation}
+The critical temperature is proportional to the spin density $\rho_0$ and inversely proportional to the square of the Yukawa screening parameter $\kappa$. As the interaction range shortens ($\kappa$ increases), it becomes harder to overcome thermal fluctuations, resulting in a sharp drop in $T_c$.
+
+\subsection{Finite-Size Scaling in Periodic Ring (Case B)}
+While a true macroscopic phase transition does not occur in a ring of finite size $L$, a crossover takes place under the condition $\xi \approx L$, where the entire system falls under the dominance of the local field $h_0$. The pseudo-critical temperature $T^*$ at this point follows a Finite-Size Scaling relation:
+\begin{equation}
+    T^* \approx T_c \left( 1 + \frac{C}{c\kappa^2 L^2} \right)
+\end{equation}
+Mathematically, the smaller the system size ($L \to 0$), the more maximized the interference effect of the local field becomes. Consequently, the formation of order initiates at a temperature higher than the bulk $T_c$ ($\Delta T \propto 1/L^2$).
+
+\section{Proposed Verification via Monte Carlo Simulation}
+To validate these theoretical derivations and extend the study into the non-linear regime, we propose a Metropolis Monte Carlo simulation. Since simulations do not rely on mathematical approximations, they serve as a powerful tool to cross-validate the non-linearity of the Master Equation.
+\begin{enumerate}
+    \item \textbf{Linear vs Non-linear Regime:} We aim to demonstrate that the spin profile $\langle s_i \rangle$ obtained from the simulation perfectly matches the theoretical linear solutions ($\exp$ and $\cosh$) in the $T \gtrsim T_c$ regime. Conversely, when the temperature drops significantly or $h_0$ becomes strong enough to break the linear approximation, we expect to observe kink-like penetration profiles caused by the non-linear terms of the Master Equation.
+    \item \textbf{Scaling Validation:} By varying the ring size $L$, we will statistically verify whether the shift in the extracted $T^*$ follows the theoretically predicted $1/L^2$ trajectory.
+    \item \textbf{Screening Effect:} We will track the collapse of the correlation length $\xi$ as the Yukawa screening parameter $\kappa$ changes, thereby confirming the critical universality with the short-range Ising model.
+\end{enumerate}
+
+\section{Conclusion}
+In this study, we applied the Hubbard-Stratonovich transformation to the microscopic Ising-Yukawa model to derive a rigorous non-linear field-theoretic Master Equation. Through Taylor expansion, we mathematically proved the non-linear coupling mechanism by which an external field $h(\mathbf{r})$ modulates the local critical temperature. Furthermore, using linearized governing equations, we successfully elucidated the propagation profiles of order ($\exp$ and $\cosh$ forms) under specific geometric conditions, as well as the finite-size scaling law ($\Delta T \propto 1/L^2$). 
+This framework provides a comprehensive theoretical foundation for understanding surface critical phenomena and phase transitions in nano-confined spaces within Soft Matter systems, and will serve as a crucial benchmark for future non-linear simulation studies and Electrical Double Layer (EDL) dynamics analysis.
+\end{document}
