@@ -16,6 +16,17 @@
 #include "sprng.h"   /* SPRNG header file (Parallel random number generator) */
 #include <curand_kernel.h>
 
+/* CUDA 에러 체크 매크로 */
+#define CUDA_CHECK(call) \
+    do { \
+        cudaError_t err = call; \
+        if (err != cudaSuccess) { \
+            fprintf(stderr, "CUDA Error: %s (code: %d) at %s:%d\n", \
+                    cudaGetErrorString(err), err, __FILE__, __LINE__); \
+            exit(EXIT_FAILURE); \
+        } \
+    } while(0)
+
 /* 랜덤 넘버 관련 전역 변수 */
 int streamnum, nstreams, gtype, *stream;
 
@@ -53,6 +64,15 @@ void initial_conf();
 void update_metropolis(double Temp);
 void measure_profile();
 void measure_correlation(int jj);
+
+/* CUDA 커널: curandState 난수 상태 초기화 */
+__global__ void init_rand_states_kernel(curandState *states, int L, unsigned long seed)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < L) {
+        curand_init(seed + idx, 0, 0, &states[idx]);
+    }
+}
 
 /* CUDA 커널: 메트로폴리스 업데이트 병렬 처리 */
 __global__ void update_metropolis_kernel(int *d_th, const double *d_yukawa_table, curandState *states, int L, int rc, double Temp, double h0_mag)
@@ -154,10 +174,18 @@ int main(int argc, char **argv)
     mag_time_mpi = (double *)malloc(Tms * sizeof(double));
     
     /* CUDA 디바이스(GPU) 메모리 할당 */
-    cudaMalloc((void **)&d_th, L * sizeof(int));
-    cudaMalloc((void **)&d_corr_snapshots, N_snap * (L / 2) * sizeof(double));
-    cudaMalloc((void **)&d_rand_states, L * sizeof(curandState));
-    cudaMemset(d_corr_snapshots, 0, N_snap * (L / 2) * sizeof(double)); // GPU 배열 0으로 초기화
+    CUDA_CHECK(cudaMalloc((void **)&d_th, L * sizeof(int)));
+    CUDA_CHECK(cudaMalloc((void **)&d_corr_snapshots, N_snap * (L / 2) * sizeof(double)));
+    CUDA_CHECK(cudaMalloc((void **)&d_rand_states, L * sizeof(curandState)));
+
+    /* GPU 난수 생성기(curandState) 초기화 (누락 시 커널 에러 발생) */
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (L + threadsPerBlock - 1) / threadsPerBlock;
+    init_rand_states_kernel<<<blocksPerGrid, threadsPerBlock>>>(d_rand_states, L, SEED + myrank);
+    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaDeviceSynchronize());
+
+    CUDA_CHECK(cudaMemset(d_corr_snapshots, 0, N_snap * (L / 2) * sizeof(double))); // GPU 배열 0으로 초기화
 
     // 유카와 퍼텐셜 룩업 테이블 초기화
     init_yukawa(kappa);
@@ -217,7 +245,7 @@ int main(int argc, char **argv)
     } /* end of irun */
 
     /* 모든 앙상블이 완전히 끝난 후, GPU에 누적된 최종 상관함수 데이터를 CPU로 딱 1번만 복사 */
-    cudaMemcpy(corr_snapshots, d_corr_snapshots, N_snap * (L / 2) * sizeof(double), cudaMemcpyDeviceToHost);
+    CUDA_CHECK(cudaMemcpy(corr_snapshots, d_corr_snapshots, N_snap * (L / 2) * sizeof(double), cudaMemcpyDeviceToHost));
 
     /* 단일 MPI 노드 내에서 시간 및 앙상블 평균 계산 */
     for(int i = 0; i < L; i++) {
@@ -342,8 +370,8 @@ void init_yukawa(double kap)
     for (int r = 1; r <= rc; r++) {
         yukawa_table[r] = exp(-kap * r);
     }
-    cudaMalloc((void **)&d_yukawa_table, (rc + 1) * sizeof(double));
-    cudaMemcpy(d_yukawa_table, yukawa_table, (rc + 1) * sizeof(double), cudaMemcpyHostToDevice);
+    CUDA_CHECK(cudaMalloc((void **)&d_yukawa_table, (rc + 1) * sizeof(double)));
+    CUDA_CHECK(cudaMemcpy(d_yukawa_table, yukawa_table, (rc + 1) * sizeof(double), cudaMemcpyHostToDevice));
 }
 
 /* 스핀 및 프로파일 초기화 */
@@ -358,13 +386,14 @@ void initial_conf()
 void update_metropolis(double Temp)
 {
     // CPU의 스핀 배열을 GPU로 복사
-    cudaMemcpy(d_th, th, L * sizeof(int), cudaMemcpyHostToDevice);
+    CUDA_CHECK(cudaMemcpy(d_th, th, L * sizeof(int), cudaMemcpyHostToDevice));
     // CUDA 커널 실행
     int threadsPerBlock = 256;
     int blocksPerGrid = (L + threadsPerBlock - 1) / threadsPerBlock;
     update_metropolis_kernel<<<blocksPerGrid, threadsPerBlock>>>(d_th, d_yukawa_table, d_rand_states, L, rc, Temp, h0_mag);
+    CUDA_CHECK(cudaGetLastError());
     // GPU에서 업데이트된 스핀 배열을 다시 CPU로 복사
-    cudaMemcpy(th, d_th, L * sizeof(int), cudaMemcpyDeviceToHost);
+    CUDA_CHECK(cudaMemcpy(th, d_th, L * sizeof(int), cudaMemcpyDeviceToHost));
 }
 
 /* 스핀 프로파일 누적 */
@@ -379,10 +408,11 @@ void measure_profile()
 void measure_correlation(int jj)
 {
     // 1. 현재 스핀 배열을 호스트(CPU)에서 디바이스(GPU)로 복사
-    cudaMemcpy(d_th, th, L * sizeof(int), cudaMemcpyHostToDevice);
+    CUDA_CHECK(cudaMemcpy(d_th, th, L * sizeof(int), cudaMemcpyHostToDevice));
 
     // 2. CUDA 커널 실행 (블록당 256 스레드 구성)
     int threadsPerBlock = 256;
     int blocksPerGrid = (L / 2 + threadsPerBlock - 1) / threadsPerBlock;
     measure_correlation_kernel<<<blocksPerGrid, threadsPerBlock>>>(d_th, d_corr_snapshots, jj, L);
+    CUDA_CHECK(cudaGetLastError());
 }

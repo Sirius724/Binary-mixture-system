@@ -17,8 +17,8 @@ for t in "${T_sim_list[@]}"; do
     for k in "${kappa_list[@]}"; do
       
       echo " -> Submitting: T_sim=$t, h0_mag=$h, kappa=$k"
-      # -v 옵션으로 변수를 qsub.sh에 전달, -N으로 고유 작업 이름 설정, -o로 개별 로그파일 지정
-      qsub -N "Ising_${t}_${h}_${k}" -o "logs/sim_${t}_${h}_${k}.log" -v T_SIM=$t,H0_MAG=$h,KAPPA=$k qsub.sh
+      # -v 옵션 전달 및 -e(에러 로그) 지정 추가
+      qsub -N "Ising_${t}_${h}_${k}" -o "logs/sim_${t}_${h}_${k}.log" -e "logs/err_${t}_${h}_${k}.log" -v T_SIM=$t,H0_MAG=$h,KAPPA=$k qsub.sh
       
     done
   done

@@ -1,9 +1,14 @@
-#!/bin/sh
+#!/bin/bash
 
-# これはコメントです
-# echo "コメントは実行されません！"
-#a=(0.1 0.2 0.3 0.4 0.5 0.6 0.8 1.0 2.0)
-ini_id=940688
-for ((i=0 ; i<50;i++))
-do qdel $((ini_id+i))
+if [ -z "$1" ]; then
+    echo "Usage: ./qdel.sh <start_job_id>"
+    echo "Example: ./qdel.sh 80000"
+    exit 1
+fi
+
+ini_id=$1
+
+for ((i=0 ; i<200; i++))
+do 
+    qdel $((ini_id+i))
 done
