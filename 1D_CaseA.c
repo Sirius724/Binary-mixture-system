@@ -137,7 +137,6 @@ int main(int argc, char **argv)
         for(int j = 0; j < Tms; j++) {
             update_metropolis(T_sim);
             measure_profile();
-            measure_correlation();
             
             // 현재 스텝의 전체 자화량 계산 및 누적
             double current_mag = 0.0;
@@ -191,9 +190,17 @@ int main(int argc, char **argv)
             mkdir("data", 0777);
     #endif
 
-        FILE *fp = fopen("data/spin_profile.txt", "w+");
-        FILE *fc = fopen("data/spin_correlation.txt", "w+");
-        FILE *fm = fopen("data/mag_time.txt", "w+");
+        char fname_profile[256];
+        char fname_corr[256];
+        char fname_mag[256];
+        
+        snprintf(fname_profile, sizeof(fname_profile), "data/spin_profile_T%.3f_h%.3f_k%.3f.txt", T_sim, h0_mag, kappa);
+        snprintf(fname_corr, sizeof(fname_corr), "data/spin_correlation_T%.3f_h%.3f_k%.3f.txt", T_sim, h0_mag, kappa);
+        snprintf(fname_mag, sizeof(fname_mag), "data/mag_time_T%.3f_h%.3f_k%.3f.txt", T_sim, h0_mag, kappa);
+
+        FILE *fp = fopen(fname_profile, "w+");
+        FILE *fc = fopen(fname_corr, "w+");
+        FILE *fm = fopen(fname_mag, "w+");
         if (fp == NULL || fc == NULL || fm == NULL) {
             printf("Error: Cannot create/open 'data' directory or file.\n");
             MPI_Abort(MPI_COMM_WORLD, 1);
@@ -240,9 +247,9 @@ int main(int argc, char **argv)
         fclose(fm);
 
         total_s /= (double)L;
-        printf("Simulation completed. Profile saved to data/spin_profile.txt\n");
-        printf("Correlation saved to data/spin_correlation.txt\n");
-        printf("Magnetization vs Time saved to data/mag_time.txt\n");
+        printf("Simulation completed. Profile saved to %s\n", fname_profile);
+        printf("Correlation saved to %s\n", fname_corr);
+        printf("Magnetization vs Time saved to %s\n", fname_mag);
         printf("Average magnetization <s>: %10.6f\n", total_s);
     }
 
@@ -333,12 +340,13 @@ void measure_correlation()
     int r_dist, i;
     for(r_dist = 0; r_dist < L / 2; r_dist++) // 보통 L/2까지만 측정
     {
-        double spatial_sum = 0.0;
+        int spatial_sum = 0; // CPU 연산 최적화를 위해 실수(double) 대신 정수(int) 덧셈 활용
         for(i = 0; i < L; i++)
         {
-            int j = (i + r_dist) % L; // 주기적 경계 조건(Case B)용
-            spatial_sum += (double)(th[i] * th[j]);
+            int j = i + r_dist;
+            if (j >= L) j -= L; // 느린 모듈로(%) 연산을 조건문으로 대체
+            spatial_sum += th[i] * th[j];
         }
-        temp_corr[r_dist] = spatial_sum / (double)L;
+        temp_corr[r_dist] = (double)spatial_sum / (double)L;
     }
 }
