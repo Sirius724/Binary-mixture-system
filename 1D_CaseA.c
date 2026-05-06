@@ -1,5 +1,6 @@
 /**********************************************************************/
 /********** 1D Ising-Yukawa Model (Metropolis, Local Field)      ******/
+/********** Case A : Semi-infinite System (Open Boundary)        ******/
 /********** MPI-Version / Random number generator : sprng2.0a    ******/
 /********** Measurement : Spatial Spin Profile <s_i>             ******/
 /**********************************************************************/
@@ -19,12 +20,12 @@
 int streamnum, nstreams, gtype, *stream;
 
 /* 시뮬레이션 물리 파라미터 */
-int L = 1000;           // 시스템 크기 (유한 크기 스케일링 검증 시 변경)
+int L = 1000;           // 시스템 크기 (충분히 커야 무한대 경계처럼 작동)
 int Nrun = 20;          // 앙상블 반복 횟수
 int Teq = 10000;        // 열평형(Equilibration) 도달을 위한 MCS
 int Tms = 50000;        // 프로파일 측정을 위한 MCS
 int N_snap;             // 상관함수 저장을 위한 시간 스냅샷 개수 (동적 계산)
-double T_sim = 2.5;     // 측정 온도 (Tc 이상/이하 조건에 따라 변경)
+double T_sim = 2.5;     // 측정 온도 
 double kappa = 0.1;     // 유카와 스크리닝 파라미터
 double h0_mag = 2.0;    // x=0 위치의 국소적 외부 자기장 강도
 
@@ -33,7 +34,7 @@ int *th;
 double *spin_profile;
 double *spin_profile_mpi;
 double *yukawa_table;
-double *corr_snapshots;    // 시간별 상관함수 앙상블 누적용 (N_snap * L/2)
+double *corr_snapshots;    // 시간별 상관함수 앙상블 누적용
 double *corr_snapshots_mpi;// MPI 취합용
 double *temp_corr;         // 각 측정 단계 저장용
 int *snap_times;           // 측정할 시간(MCS) 목록 배열
@@ -62,7 +63,7 @@ int main(int argc, char **argv)
 
     if (myrank == 0) {
         printf("==========================================\n");
-        printf("Simulation Parameters:\n");
+        printf("Simulation Parameters (Case A: Semi-infinite):\n");
         printf("T_sim  : %.3f\n", T_sim);
         printf("h0_mag : %.3f\n", h0_mag);
         printf("kappa  : %.3f\n", kappa);
@@ -76,7 +77,7 @@ int main(int argc, char **argv)
     gtype = 0;
     stream = init_sprng(gtype, streamnum, nstreams, SEED, SPRNG_DEFAULT);
 
-    /* 지수 함수적 스냅샷 시간 계산 (10, 20, 40, 80 ...) */
+    /* 지수 함수적 스냅샷 시간 계산 */
     N_snap = 0;
     int current_t = 10;
     while(current_t <= Tms) {
@@ -121,31 +122,28 @@ int main(int argc, char **argv)
     {
         initial_conf();
 
-        // 1. 열평형 (Equilibration) 단계 - 측정 없이 시스템 이완
+        // 1. 열평형 (Equilibration) 단계
         for (int j = 0; j < Teq; j++) {
             update_metropolis(T_sim);
             
-            // 10% 진행될 때마다 출력
             if (myrank == 0 && (j + 1) % (Teq / 10) == 0) {
                 printf("  [Run %d] Equilibration : %d / %d steps completed.\n", irun, j + 1, Teq);
             }
         }
 
-        // 2. 측정 (Measurement) 단계 - 스핀 프로파일 누적
-        int jj = 0; // 상관함수 스냅샷 인덱스
+        // 2. 측정 (Measurement) 단계
+        int jj = 0;
         int next_snap_time = 10;
         for(int j = 0; j < Tms; j++) {
             update_metropolis(T_sim);
             measure_profile();
             
-            // 현재 스텝의 전체 자화량 계산 및 누적
             double current_mag = 0.0;
             for(int i = 0; i < L; i++) current_mag += th[i];
-            mag_time[j] += current_mag / (double)L;
+            mag_time[j] += fabs(current_mag / (double)L);
             
-            // 지수적으로 증가하는 지정된 시간(10, 20, 40...)마다 상관함수 측정 및 누적
             if ((j + 1) == next_snap_time && jj < N_snap) {
-                measure_correlation(); // temp_corr에 현재 상태 저장
+                measure_correlation(); 
                 for (int i = 0; i < L / 2; i++) {
                     corr_snapshots[jj * (L / 2) + i] += temp_corr[i];
                 }
@@ -153,23 +151,16 @@ int main(int argc, char **argv)
                 next_snap_time *= 2;
             }
 
-            // 10% 진행될 때마다 출력
             if (myrank == 0 && (j + 1) % (Tms / 10) == 0) {
                 printf("  [Run %d] Measurement   : %d / %d steps completed.\n", irun, j + 1, Tms);
             }
         }
-    } /* end of irun */
+    }
 
-    /* 단일 MPI 노드 내에서 시간 및 앙상블 평균 계산 */
-    for(int i = 0; i < L; i++) {
-        spin_profile[i] = spin_profile[i] / (double)(Tms * Nrun);
-    }
-    for(int i = 0; i < N_snap * (L / 2); i++) {
-        corr_snapshots[i] /= (double)Nrun;
-    }
-    for(int j = 0; j < Tms; j++) {
-        mag_time[j] /= (double)Nrun;
-    }
+    /* 평균 계산 */
+    for(int i = 0; i < L; i++) spin_profile[i] = spin_profile[i] / (double)(Tms * Nrun);
+    for(int i = 0; i < N_snap * (L / 2); i++) corr_snapshots[i] /= (double)Nrun;
+    for(int j = 0; j < Tms; j++) mag_time[j] /= (double)Nrun;
 
     /* 모든 MPI 노드의 데이터를 취합 */
     MPI_Barrier(MPI_COMM_WORLD);
@@ -178,53 +169,39 @@ int main(int argc, char **argv)
     MPI_Reduce(mag_time, mag_time_mpi, Tms, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
     MPI_Barrier(MPI_COMM_WORLD);
 
-    /* 0번 노드에서 결과 파일 저장 */
+    /* 결과 파일 저장 */
     if(myrank == 0)
     {
         double total_s = 0.0;
         
-            // 데이터 저장 폴더 생성 (이미 존재하면 무시됨)
-    #ifdef _WIN32
-            _mkdir("data");
-    #else
-            mkdir("data", 0777);
-    #endif
+#ifdef _WIN32
+        _mkdir("data");
+#else
+        mkdir("data", 0777);
+#endif
 
-        char fname_profile[256];
-        char fname_corr[256];
-        char fname_mag[256];
+        char fname_profile[256], fname_corr[256], fname_mag[256];
         
-        snprintf(fname_profile, sizeof(fname_profile), "data/spin_profile_T%.3f_h%.3f_k%.3f.txt", T_sim, h0_mag, kappa);
-        snprintf(fname_corr, sizeof(fname_corr), "data/spin_correlation_T%.3f_h%.3f_k%.3f.txt", T_sim, h0_mag, kappa);
-        snprintf(fname_mag, sizeof(fname_mag), "data/mag_time_T%.3f_h%.3f_k%.3f.txt", T_sim, h0_mag, kappa);
+        snprintf(fname_profile, sizeof(fname_profile), "data/CaseA_spin_profile_T%.3f_h%.3f_k%.3f.txt", T_sim, h0_mag, kappa);
+        snprintf(fname_corr, sizeof(fname_corr), "data/CaseA_spin_correlation_T%.3f_h%.3f_k%.3f.txt", T_sim, h0_mag, kappa);
+        snprintf(fname_mag, sizeof(fname_mag), "data/CaseA_mag_time_T%.3f_h%.3f_k%.3f.txt", T_sim, h0_mag, kappa);
 
         FILE *fp = fopen(fname_profile, "w+");
         FILE *fc = fopen(fname_corr, "w+");
         FILE *fm = fopen(fname_mag, "w+");
-        if (fp == NULL || fc == NULL || fm == NULL) {
-            printf("Error: Cannot create/open 'data' directory or file.\n");
-            MPI_Abort(MPI_COMM_WORLD, 1);
-        }
 
         for(int i = 0; i < L; i++)
         {
-            // 노드 개수(np)로 나누어 최종 앙상블 평균 완성
             spin_profile_mpi[i] /= (double)np;
             total_s += spin_profile_mpi[i];
             
-            // Plotting의 편의를 위해 원점(x=0)을 중앙으로 정렬 (-L/2 ~ L/2)
-            int x_coord = i;
-            if (i > L / 2) x_coord = i - L;
-            
-            fprintf(fp, "%d %10.6f\n", x_coord, spin_profile_mpi[i]);
+            // Case A는 원점(x=0)에서 한 방향으로만 뻗어나가므로 0부터 L-1까지 그대로 기록합니다.
+            fprintf(fp, "%d %10.6f\n", i, spin_profile_mpi[i]);
         }
         fclose(fp);
 
-        // 상관함수 파일 헤더 작성 (각 스냅샷 시간)
         fprintf(fc, "r ");
-        for (int jj = 0; jj < N_snap; jj++) {
-            fprintf(fc, "MCS_%d ", snap_times[jj]);
-        }
+        for (int jj = 0; jj < N_snap; jj++) fprintf(fc, "MCS_%d ", snap_times[jj]);
         fprintf(fc, "\n");
 
         for(int i = 0; i < L / 2; i++)
@@ -240,56 +217,39 @@ int main(int argc, char **argv)
         
         for(int j = 0; j < Tms; j++)
         {
-            // 노드 개수(np)로 나누어 자화량 앙상블 평균 완성
             mag_time_mpi[j] /= (double)np;
             fprintf(fm, "%d %10.6f\n", j, mag_time_mpi[j]);
         }
         fclose(fm);
 
         total_s /= (double)L;
-        printf("Simulation completed. Profile saved to %s\n", fname_profile);
-        printf("Correlation saved to %s\n", fname_corr);
-        printf("Magnetization vs Time saved to %s\n", fname_mag);
-        printf("Average magnetization <s>: %10.6f\n", total_s);
+        printf("Simulation completed (Case A).\n");
+        printf("Profile saved to %s\n", fname_profile);
     }
 
-    /* 메모리 해제 및 종료 */
-    free(th);
-    free(spin_profile);
-    free(spin_profile_mpi);
-    free(corr_snapshots);
-    free(corr_snapshots_mpi);
-    free(snap_times);
-    free(temp_corr);
-    free(mag_time);
-    free(mag_time_mpi);
-    free(yukawa_table);
+    /* 메모리 해제 */
+    free(th); free(spin_profile); free(spin_profile_mpi);
+    free(corr_snapshots); free(corr_snapshots_mpi); free(snap_times);
+    free(temp_corr); free(mag_time); free(mag_time_mpi); free(yukawa_table);
 
     MPI_Finalize();
     return 0;
 }
 
-/* 유카와 상호작용 컷오프 및 룩업 테이블 생성 */
 void init_yukawa(double kap)
 {
-    rc = (int)(10.0 / kap);       // exp(-10) 수준에서 컷오프
-    if (rc > L / 2) rc = L / 2;  // 최대 컷오프는 시스템의 절반 길이로 제한
+    rc = (int)(10.0 / kap);       
+    if (rc > L / 2) rc = L / 2;  
 
     yukawa_table = (double *)malloc((rc + 1) * sizeof(double));
-    for (int r = 1; r <= rc; r++) {
-        yukawa_table[r] = exp(-kap * r);
-    }
+    for (int r = 1; r <= rc; r++) yukawa_table[r] = exp(-kap * r);
 }
 
-/* 스핀 및 프로파일 초기화 */
 void initial_conf()
 {
-    for(int i = 0; i < L; i++) {
-        th[i] = (sprng(stream) < 0.5) ? -1 : 1;
-    }
+    for(int i = 0; i < L; i++) th[i] = (sprng(stream) < 0.5) ? -1 : 1;
 }
 
-/* 메트로폴리스 업데이트 (유카와 + 국소적 외부 자기장) */
 void update_metropolis(double Temp)
 {
     for(int kx = 0; kx < L; kx++)
@@ -297,56 +257,47 @@ void update_metropolis(double Temp)
         int X = (int)(sprng(stream) * L);
         double sum_interaction = 0.0;
 
-        // 컷오프 반경 내 이웃들과의 상호작용 계산
         for (int r = 1; r <= rc; r++) {
             int right = X + r;
-            if (right >= L) right -= L; // 주기적 경계 조건 우측
-            
             int left = X - r;
-            if (left < 0) left += L;    // 주기적 경계 조건 좌측
-
-            sum_interaction += (th[right] + th[left]) * yukawa_table[r];
+            
+            // Case A: 열린 경계 조건 (Open Boundary Condition)
+            // 범위를 벗어난 이웃은 상호작용에서 제외 (wrap-around 금지)
+            if (right < L) sum_interaction += th[right] * yukawa_table[r];
+            if (left >= 0) sum_interaction += th[left] * yukawa_table[r];
         }
 
         double dE = 2.0 * th[X] * sum_interaction;
 
-        // x=0 위치에만 강도 h0_mag의 외부 자기장 인가
-        if (X == 0) {
-            dE += 2.0 * th[X] * h0_mag;
-        }
+        if (X == 0) dE += 2.0 * th[X] * h0_mag; // x=0 표면에만 국소 자기장
 
-        // 메트로폴리스 수용 확률 계산
-        if (dE <= 0.0) {
+        if (dE <= 0.0 || exp(-dE / Temp) > sprng(stream)) {
             th[X] = -th[X];
-        } else {
-            if (exp(-dE / Temp) > sprng(stream)) {
-                th[X] = -th[X];
-            }
         }
     }
 }
 
-/* 스핀 프로파일 누적 */
 void measure_profile()
 {
-    for(int i = 0; i < L; i++) {
-        spin_profile[i] += th[i];
-    }
+    for(int i = 0; i < L; i++) spin_profile[i] += th[i];
 }
 
-/* 스핀 상관 함수 (Spatial Spin Correlation) 누적 */
 void measure_correlation()
 {
     int r_dist, i;
-    for(r_dist = 0; r_dist < L / 2; r_dist++) // 보통 L/2까지만 측정
+    for(r_dist = 0; r_dist < L / 2; r_dist++) 
     {
-        int spatial_sum = 0; // CPU 연산 최적화를 위해 실수(double) 대신 정수(int) 덧셈 활용
+        int spatial_sum = 0; 
+        int count = 0;
         for(i = 0; i < L; i++)
         {
             int j = i + r_dist;
-            if (j >= L) j -= L; // 느린 모듈로(%) 연산을 조건문으로 대체
-            spatial_sum += th[i] * th[j];
+            // Case A: 열린 경계 조건이므로 j가 L을 넘어가면 통계에서 제외
+            if (j < L) { 
+                spatial_sum += th[i] * th[j];
+                count++;
+            }
         }
-        temp_corr[r_dist] = (double)spatial_sum / (double)L;
+        temp_corr[r_dist] = count > 0 ? (double)spatial_sum / (double)count : 0.0;
     }
 }
