@@ -9,3 +9,4 @@ Case_B_data/
 
 # 파이썬 가상환경 폴더 무시
 venv/
+.venv/
